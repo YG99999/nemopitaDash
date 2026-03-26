@@ -43,8 +43,36 @@ function emptyReport(): DailyReportRecord {
   };
 }
 
+function buildConnectedFallback(user: ApiUser): DashboardPayload {
+  const report = emptyReport();
+
+  return {
+    agent_status: "offline",
+    last_update: new Date().toISOString(),
+    today: {
+      revenue: 0,
+      transactions: 0,
+      reviews_new: 0,
+      inventory_alerts: 0,
+      suggestions_pending: 0
+    },
+    report,
+    inventory_alerts: [],
+    suggestions: [],
+    logs: [],
+    settings: fallbackSettings(),
+    profile: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      full_name: user.full_name
+    },
+    demo_mode: false
+  };
+}
+
 export async function getDashboardData(user: ApiUser): Promise<DashboardPayload> {
-  if (!hasSupabaseEnv() || !hasServiceRole()) {
+  if (!hasSupabaseEnv()) {
     return {
       ...mockDashboard,
       profile: {
@@ -57,18 +85,13 @@ export async function getDashboardData(user: ApiUser): Promise<DashboardPayload>
     };
   }
 
+  if (!hasServiceRole()) {
+    return buildConnectedFallback(user);
+  }
+
   const supabase = getServiceSupabaseClient();
   if (!supabase) {
-    return {
-      ...mockDashboard,
-      profile: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        full_name: user.full_name
-      },
-      demo_mode: true
-    };
+    return buildConnectedFallback(user);
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -114,8 +137,10 @@ export async function getDashboardData(user: ApiUser): Promise<DashboardPayload>
       } as DailyReportRecord)
     : emptyReport();
 
-  const suggestions = (suggestionsResult.data || []) as SuggestionRecord[];
-  const logs = (logsResult.data || []) as AgentLogRecord[];
+  const suggestions = suggestionsResult.error
+    ? []
+    : ((suggestionsResult.data || []) as SuggestionRecord[]);
+  const logs = logsResult.error ? [] : ((logsResult.data || []) as AgentLogRecord[]);
   const settings = settingsResult.data
     ? ({
         daily_report_time: settingsResult.data.daily_report_time,
