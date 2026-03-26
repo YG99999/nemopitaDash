@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
 import { ActivityFeed } from "@/components/ActivityFeed";
@@ -14,7 +14,6 @@ import {
   fetchDashboard,
   saveSettings
 } from "@/lib/api";
-import { hasSupabaseEnv } from "@/lib/env";
 import { formatCurrency, formatNumber, formatRelativeDate } from "@/lib/format";
 import { mockDashboard } from "@/lib/mock-data";
 import { getBrowserSupabaseClient } from "@/lib/supabase";
@@ -28,11 +27,12 @@ export default function HomePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState("");
-  const supabaseReady = useMemo(() => hasSupabaseEnv(), []);
 
   useEffect(() => {
     let cancelled = false;
-    const client = getBrowserSupabaseClient();
+    let realtimeTopic = "";
+    let realtimeClient: Awaited<ReturnType<typeof getBrowserSupabaseClient>> | null =
+      null;
 
     async function loadDashboard() {
       try {
@@ -57,10 +57,8 @@ export default function HomePage() {
     }
 
     async function bootstrap() {
-      if (!supabaseReady) {
-        setLoading(false);
-        return;
-      }
+      const client = await getBrowserSupabaseClient();
+      realtimeClient = client;
 
       if (!client) {
         setLoading(false);
@@ -76,14 +74,9 @@ export default function HomePage() {
         return;
       }
 
-      await loadDashboard();
-    }
-
-    bootstrap();
-
-    if (client) {
-      const channel = client
-        .channel("dashboard-live")
+      realtimeTopic = `dashboard-live-${session.user.id}`;
+      client
+        .channel(realtimeTopic)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "agent_logs" },
@@ -101,16 +94,25 @@ export default function HomePage() {
         )
         .subscribe();
 
-      return () => {
-        cancelled = true;
-        client.removeChannel(channel);
-      };
+      await loadDashboard();
     }
+
+    void bootstrap();
 
     return () => {
       cancelled = true;
+      if (realtimeClient && realtimeTopic) {
+        realtimeClient
+          .getChannels()
+          .filter((channel: { topic: string }) => {
+            return channel.topic === `realtime:${realtimeTopic}`;
+          })
+          .forEach((channel: { topic: string }) => {
+            void realtimeClient?.removeChannel(channel);
+          });
+      }
     };
-  }, [router, supabaseReady]);
+  }, [router]);
 
   async function handleApprove(id: string) {
     setBusyId(id);
@@ -177,7 +179,7 @@ export default function HomePage() {
   }
 
   async function handleSignOut() {
-    const client = getBrowserSupabaseClient();
+    const client = await getBrowserSupabaseClient();
     if (!client) return;
     await client.auth.signOut();
     await router.push("/auth");
@@ -222,7 +224,7 @@ export default function HomePage() {
                 >
                   Settings
                 </button>
-                {supabaseReady ? (
+                {!dashboard.demo_mode ? (
                   <button
                     className="button button-ghost"
                     onClick={handleSignOut}
@@ -275,7 +277,7 @@ export default function HomePage() {
               <SectionCard
                 action={<span className="muted">{dashboard.report.report_date}</span>}
                 eyebrow="Daily report"
-                title="Today’s snapshot"
+                title="Today's snapshot"
               >
                 <div className="report-grid">
                   <div>

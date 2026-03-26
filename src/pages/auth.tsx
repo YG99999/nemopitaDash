@@ -1,13 +1,11 @@
 import Head from "next/head";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/router";
 
-import { hasSupabaseEnv } from "@/lib/env";
 import { getBrowserSupabaseClient } from "@/lib/supabase";
 
 export default function AuthPage() {
   const router = useRouter();
-  const supabaseEnabled = useMemo(() => hasSupabaseEnv(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"sign-in" | "sign-up" | "magic-link">(
@@ -18,7 +16,7 @@ export default function AuthPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const client = getBrowserSupabaseClient();
+    const client = await getBrowserSupabaseClient();
 
     if (!client) {
       setStatus("Supabase env vars are missing. Add them to enable auth.");
@@ -79,13 +77,6 @@ export default function AuthPage() {
             Sign in with Supabase Auth to monitor the agent, review suggestions,
             and keep operations on track.
           </p>
-
-          {!supabaseEnabled ? (
-            <div className="demo-banner">
-              Supabase env vars are missing. The dashboard will still run in demo
-              mode at `/`.
-            </div>
-          ) : null}
 
           <div className="tab-row">
             <button

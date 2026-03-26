@@ -25,11 +25,14 @@ If Supabase env vars are missing, the app falls back to demo data so the dashboa
 
 ## Required environment variables
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SECRET_KEY` (optional fallback)
 - `WEBHOOK_SECRET`
 - `NEXT_PUBLIC_SITE_URL`
+
+This app also still accepts the older `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` names, but it now prefers the Vercel Supabase integration variables above.
 
 ## API routes
 

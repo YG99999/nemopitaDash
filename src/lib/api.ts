@@ -6,7 +6,7 @@ async function getAccessToken() {
   }
 
   const { getBrowserSupabaseClient } = await import("@/lib/supabase");
-  const client = getBrowserSupabaseClient();
+  const client = await getBrowserSupabaseClient();
   if (!client) return null;
 
   const { data } = await client.auth.getSession();
